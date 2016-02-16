@@ -22,6 +22,27 @@ def getFileParameters(fileName,xval):
 
 
 # -----------------------------------------------------------------------------
+class Timer:
+    ''' Code Timer '''
+    # Constructor for Progress Class
+    # --------------------------------------------------------
+    def __init__(self,duration,on):
+        self.on = on
+        self.start = time.time()
+        self.stop = self.start + duration
+    # --------------------------------------------------------
+    
+    # --------------------------------------------------------
+    def expired(self):
+        timeExpired = False
+        if self.on:
+            timeExpired = (time.time() > self.stop)
+        return timeExpired
+    # --------------------------------------------------------
+    
+    
+
+# -----------------------------------------------------------------------------
 class Progress:
     ''' Progress Meter '''
     # Constructor for Progress Class
@@ -67,6 +88,8 @@ class BogoParams:
         
         # MC params
         self.seed = 0
+        self.limitWallClock = False
+        self.wallClock = 0.0
         
         # Job tag & id
         self.id = 0
@@ -103,7 +126,9 @@ class BogoParams:
         parser.add_argument("-s","--seed",type=int, help="RNG seed",
                                 default=0)
         parser.add_argument("--update",type=str, help="update type",
-                                default='modes')                            
+                                default='modes')
+        parser.add_argument("--wall_clock","-w",type=float,
+                                            help="set wall-clock limit")                            
         
         args = parser.parse_args()
         
@@ -146,6 +171,9 @@ class BogoParams:
                 print "Parameter files not defined: set --Cd_file AND --sigma_File"
                 sys.exit()              
             
+        if args.wall_clock is not None:
+            self.limitWallClock = True
+            self.wallClock = args.wall_clock
         
         # set id        
         self.id = str(int(calendar.timegm(time.gmtime())-1416362400)).zfill(9)
@@ -174,6 +202,8 @@ class BogoParams:
         if self.wfnType == 'Etto':
             print'\t{: <8}{: ^5}{:<12.4f}{: <8}{: ^5}{:<12.4}'.format( \
                                         'Cd','=',self.Cd,'sigma','=',self.sigma)
+        if self.limitWallClock:
+            print'\t{: <16}{: ^7}{:<12}'.format('wall_clock limit','=',self.wallClock)
                                     
     # --------------------------------------------------------
     
@@ -866,6 +896,7 @@ def main():
     params = BogoParams()
     params.parseComLin()
     params.output()
+    aTimer = Timer(params.wallClock*(3600),params.limitWallClock)
     bogoMC = BogoMC(params)
     
     # -----------------------------------------------
@@ -891,6 +922,9 @@ def main():
             accData = bogoMC.MCupdate()
         bogoMC.writeData()        
         progMeter.update(b+1)
+        if aTimer.expired():
+            print 'Reached wall clock limit!'
+            break
     
     # -----------------------------------------------
     # Finalize
